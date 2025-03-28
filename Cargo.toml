@@ -1,0 +1,12 @@
+[package]
+name = "qulacs-worker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tket-json-rs = "0.7.2"
+qulacs-bridge = { path = "../qulacs-bridge", features = ["num"] }
+exmex = "0.20.4"
+num = "0.4.3"
