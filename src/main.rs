@@ -1,16 +1,23 @@
-use std::{collections::HashMap, env::args, f64::consts::PI, fs::File, path::PathBuf};
+mod results;
+
+use std::f64::consts::PI;
+use std::{collections::HashMap, env::args, fs::File, path::PathBuf};
 
 use exmex::{eval_str, ExError};
-use num::Complex;
 use qulacs_bridge::ffi::{
-    add_gate_copy, merge, new_diagonal_matrix_gate, new_measurement, new_quantum_circuit,
-    new_r_x_gate, new_r_z_gate, new_x_gate, new_y_gate, new_z_gate, QuantumCircuit,
+    add_gate_copy, get_classical_register, merge, new_cnot_gate, new_h_gate, new_measurement,
+    new_pauli_rotation_gate, new_quantum_circuit, new_quantum_state, new_r_x_gate, new_r_z_gate,
+    new_x_gate, new_y_gate, new_z_gate, set_zero_state, update_quantum_state, Pauli,
+    QuantumCircuit,
 };
 use qulacs_bridge::UniquePtr;
+use rand::rngs::SmallRng;
+use rand::{Rng, RngCore, SeedableRng};
+use results::{convert_shots, BackendResult};
 use serde::{Deserialize, Serialize};
 use tket_json_rs::{circuit_json::Command, OpType, SerialCircuit};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 struct NodeDefinition {
     function_name: String,
     inputs: HashMap<String, PathBuf>,
@@ -26,23 +33,49 @@ fn get_arg(cmd: &Command, index: usize) -> u32 {
 }
 
 fn get_param(cmd: &Command, index: usize) -> Result<f64, ExError> {
-    eval_str(&cmd.op.params.as_ref().expect("No params")[index])
+    let param = &cmd.op.params.as_ref().expect("No params")[index];
+    // Hacks to get around the way symengine specifies particular operators
+    // and constants. Certainly not perfect and should be dealt with later.
+    let param = param.to_string().replace("**", "^");
+    let param = param.replace("pi", "PI");
+    eval_str(&param)
 }
 
-fn convert_circuit(circuit: SerialCircuit) -> UniquePtr<QuantumCircuit> {
+fn new_rng(seed: Option<u64>) -> Box<dyn RngCore> {
+    if let Some(seed) = seed {
+        Box::new(SmallRng::seed_from_u64(seed))
+    } else {
+        Box::new(rand::rng())
+    }
+}
+
+fn convert_circuit(
+    circuit: &SerialCircuit,
+    rng: &mut Box<dyn RngCore>,
+) -> UniquePtr<QuantumCircuit> {
     let qulacs_circuit = new_quantum_circuit(circuit.qubits.len().try_into().unwrap());
 
-    for command in circuit.commands {
+    for command in &circuit.commands {
         let gate = match command.op.op_type {
             // Pauli Gates
             OpType::X => new_x_gate(get_arg(&command, 0)),
             OpType::Y => new_y_gate(get_arg(&command, 0)),
             OpType::Z => new_z_gate(get_arg(&command, 0)),
+            // Hadamard
+            OpType::H => new_h_gate(get_arg(&command, 0)),
+            // CNOT
+            OpType::CX => {
+                let control = get_arg(&command, 0);
+                let target = get_arg(&command, 1);
+                new_cnot_gate(control, target)
+            }
             // Quantinuum Gateset
             OpType::PhasedX => {
                 let index = get_arg(&command, 0);
-                let alpha = get_param(&command, 0).unwrap();
-                let beta = get_param(&command, 1).unwrap();
+                // Qulacs rotations are the opposite direction
+                // to pytket rotations.
+                let alpha = -get_param(&command, 0).unwrap() * PI;
+                let beta = -get_param(&command, 1).unwrap() * PI;
                 merge(
                     &merge(&new_r_z_gate(index, beta), &new_r_x_gate(index, alpha)),
                     &new_r_z_gate(index, -beta),
@@ -51,29 +84,16 @@ fn convert_circuit(circuit: SerialCircuit) -> UniquePtr<QuantumCircuit> {
             OpType::ZZPhase => {
                 let index_1 = get_arg(&command, 0);
                 let index_2 = get_arg(&command, 1);
-                let alpha = get_param(&command, 1).unwrap();
+                let alpha = -get_param(&command, 0).unwrap() * PI;
 
-                let exponent = Complex {
-                    re: 0.0,
-                    im: 0.5 * PI * alpha,
-                };
-                let neg_exponent = -exponent;
-
-                let outer = neg_exponent.exp();
-                let inner = exponent.exp();
-
-                new_diagonal_matrix_gate(
-                    &[index_1, index_2],
-                    &[outer.into(), inner.into(), inner.into(), outer.into()],
-                )
+                new_pauli_rotation_gate(&[index_1, index_2], &[Pauli::Z, Pauli::Z], alpha)
             }
             OpType::Measure => {
-                // TODO: This doesn't feel safe to me without checking
-                // what kind of registers these are.
                 let index = get_arg(&command, 0);
                 let reg = get_arg(&command, 1);
+                let seed = rng.random();
 
-                new_measurement(index, reg)
+                new_measurement(index, reg, seed)
             }
             _ => unimplemented!(),
         };
@@ -84,17 +104,70 @@ fn convert_circuit(circuit: SerialCircuit) -> UniquePtr<QuantumCircuit> {
     qulacs_circuit
 }
 
-fn simulate_circuit() {}
+fn simulate_circuit(
+    circuit: &SerialCircuit,
+    n_shot: u32,
+    mut rng: &mut Box<dyn RngCore>,
+) -> BackendResult {
+    let n_qubits = circuit.qubits.len();
+    let bits = circuit.bits.clone();
+    let qubits = circuit.qubits.clone();
 
-fn simulate_circuits(list_circ: &[SerialCircuit], n_shot: i32) {}
+    let state = new_quantum_state(n_qubits.try_into().unwrap(), true);
+    let circuit = convert_circuit(circuit, &mut rng);
+
+    let mut shots = Vec::new();
+    for _ in 0..n_shot {
+        set_zero_state(&state);
+        update_quantum_state(&circuit, &state, rng.random());
+        let register = get_classical_register(&state);
+        shots.push(register);
+    }
+    let shots = convert_shots(shots);
+    BackendResult {
+        bits,
+        qubits,
+        shots,
+    }
+}
+
+fn simulate_circuits(
+    list_circ: &[SerialCircuit],
+    n_shot: u32,
+    seed: Option<u64>,
+) -> Vec<BackendResult> {
+    let mut rng = new_rng(seed);
+    list_circ
+        .iter()
+        .map(|circuit| simulate_circuit(circuit, n_shot, &mut rng))
+        .collect()
+}
 
 fn run(node_definition: &NodeDefinition) -> std::io::Result<()> {
     match &*node_definition.function_name {
         "simulate_circuits" => {
             let circuits_file = File::open(&node_definition.inputs["circuits"])?;
-            let circuits: Vec<_> = serde_json::from_reader(&circuits_file)?;
+            let circuits: Vec<SerialCircuit> = serde_json::from_reader(&circuits_file)?;
 
-            let results = simulate_circuits(&circuits, 100);
+            let results = simulate_circuits(&circuits, 50, None);
+
+            let outputs_file = File::create(&node_definition.outputs["backend_results"])?;
+            serde_json::to_writer(outputs_file, &results)?;
+
+            File::create(&node_definition.done_path)?;
+            Ok(())
+        }
+        "simulate_circuit" => {
+            let circuit_file = File::open(&node_definition.inputs["circuit"])?;
+            let circuit: SerialCircuit = serde_json::from_reader(&circuit_file)?;
+
+            let mut rng = new_rng(None);
+            let result = simulate_circuit(&circuit, 50, &mut rng);
+
+            let output_file = File::create(&node_definition.outputs["backend_result"])?;
+            serde_json::to_writer(output_file, &result)?;
+
+            File::create(&node_definition.done_path)?;
             Ok(())
         }
         _ => unimplemented!(),
@@ -111,21 +184,30 @@ fn main() -> std::io::Result<()> {
     let node_definition_file = File::open(node_definition_path)?;
     let node_definition: NodeDefinition = serde_json::from_reader(node_definition_file)?;
 
-    run(&node_definition);
+    run(&node_definition)?;
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use tket_json_rs::circuit_json::Operation;
 
     use super::*;
 
-    #[test]
-    fn test_get_param_parse_expression() {
+    #[rstest]
+    #[case("1", 1.0)]
+    #[case("1/2", 0.5)]
+    #[case("2**2", 4.0)]
+    #[case("2**2", 4.0)]
+    #[case("pi", 3.141592653589793)]
+    #[case("-(234.0 - 0.304074011085012*pi**(-1))", -233.90321023614007)]
+    #[case("-234.0 + 0.304074011085012/pi", -233.90321023614007)]
+    #[case("0.306088405064804", 0.306088405064804)]
+    fn get_param_parse_expression(#[case] expr: &str, #[case] expected: f64) {
         let mut op = Operation::from_optype(OpType::PhasedX);
-        op.params = Some(vec!["1/2".to_string()]);
+        op.params = Some(vec![expr.to_string()]);
         let command = Command {
             op,
             args: Vec::new(),
@@ -133,6 +215,208 @@ mod tests {
         };
 
         let param = get_param(&command, 0).unwrap();
-        assert_eq!(param, 0.5);
+        assert_eq!(param, expected);
+    }
+
+    #[test]
+    fn test_rng() {
+        let mut rng1 = new_rng(None);
+        let mut rng2 = new_rng(None);
+
+        // Some chance this could potentially happen, but it's
+        // reasonably unlikely.
+        assert_ne!(rng1.random::<u32>(), rng2.random::<u32>());
+        assert_ne!(rng1.random::<u64>(), rng2.random::<u64>());
+    }
+
+    #[test]
+    fn test_seeded_rng() {
+        let mut rng1 = new_rng(Some(1));
+        let mut rng2 = new_rng(Some(1));
+
+        assert_eq!(rng1.random::<u32>(), rng2.random::<u32>());
+        assert_eq!(rng1.random::<u64>(), rng2.random::<u64>());
+
+        insta::assert_debug_snapshot!(rng1.random::<u32>());
+        insta::assert_debug_snapshot!(rng2.random::<u32>());
+    }
+
+    #[test]
+    fn bell_measurement_circuit() -> std::io::Result<()> {
+        let file = File::open("data/bell_measurement.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(None);
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0 || shot == 192
+        }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn bell_measurement_circuit_seeded() -> std::io::Result<()> {
+        let file = File::open("data/bell_measurement.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(Some(1));
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0 || shot == 192
+        }));
+
+        insta::assert_debug_snapshot!(result.shots);
+
+        Ok(())
+    }
+
+    #[test]
+    fn phased_x_circuit() -> std::io::Result<()> {
+        let file = File::open("data/phasedx.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(None);
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0 || shot == 128
+        }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn phased_x_circuit_seeded() -> std::io::Result<()> {
+        let file = File::open("data/phasedx.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(Some(1));
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0 || shot == 128
+        }));
+
+        insta::assert_debug_snapshot!(result.shots);
+
+        Ok(())
+    }
+
+    #[test]
+    fn zz_phase_circuit() -> std::io::Result<()> {
+        let file = File::open("data/zzphase.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(None);
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0
+        }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn zz_phase_circuit_seeded() -> std::io::Result<()> {
+        let file = File::open("data/zzphase.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(Some(1));
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0
+        }));
+
+        insta::assert_debug_snapshot!(result.shots);
+
+        Ok(())
+    }
+
+    #[test]
+    fn phased_x_zz_phase_circuit() -> std::io::Result<()> {
+        let file = File::open("data/phasedx_zzphase.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(None);
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0 || shot == 64 || shot == 128 || shot == 192
+        }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn phased_x_zz_phase_circuit_seeded() -> std::io::Result<()> {
+        let file = File::open("data/phasedx_zzphase.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(Some(1));
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        assert!(result.shots.array.iter().all(|x| {
+            let shot = x[0];
+            shot == 0 || shot == 64 || shot == 128 || shot == 192
+        }));
+
+        insta::assert_debug_snapshot!(result.shots);
+
+        Ok(())
+    }
+
+    #[test]
+    fn chemistry_example_circuit() -> std::io::Result<()> {
+        let file = File::open("data/chemistry.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(None);
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+
+        Ok(())
+    }
+
+    #[test]
+    fn chemistry_example_circuit_seeded() -> std::io::Result<()> {
+        let file = File::open("data/chemistry.json")?;
+        let circuit: SerialCircuit = serde_json::from_reader(&file)?;
+
+        let mut rng = new_rng(Some(1));
+        let result = simulate_circuit(&circuit, 10, &mut rng);
+
+        assert_eq!(result.shots.array.len(), 10);
+        insta::assert_debug_snapshot!(result.shots);
+
+        Ok(())
     }
 }

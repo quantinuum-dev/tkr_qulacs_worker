@@ -1,0 +1,40 @@
+---
+source: src/main.rs
+assertion_line: 394
+expression: result.shots
+---
+OutcomeArray {
+    width: 2,
+    array: [
+        [
+            192,
+        ],
+        [
+            128,
+        ],
+        [
+            128,
+        ],
+        [
+            0,
+        ],
+        [
+            64,
+        ],
+        [
+            128,
+        ],
+        [
+            64,
+        ],
+        [
+            128,
+        ],
+        [
+            192,
+        ],
+        [
+            192,
+        ],
+    ],
+}

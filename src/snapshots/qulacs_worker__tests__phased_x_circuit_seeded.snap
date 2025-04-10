@@ -1,0 +1,39 @@
+---
+source: src/main.rs
+expression: result.shots
+---
+OutcomeArray {
+    width: 1,
+    array: [
+        [
+            0,
+        ],
+        [
+            0,
+        ],
+        [
+            128,
+        ],
+        [
+            128,
+        ],
+        [
+            0,
+        ],
+        [
+            0,
+        ],
+        [
+            0,
+        ],
+        [
+            128,
+        ],
+        [
+            0,
+        ],
+        [
+            0,
+        ],
+    ],
+}
