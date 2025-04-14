@@ -7,11 +7,14 @@ edition = "2021"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 tket-json-rs = "0.7.2"
+# qulacs-bridge = { version = "0.1", features = ["num"] }
 qulacs-bridge = { path = "../qulacs-bridge", features = ["num"] }
 exmex = "0.20.4"
 num = "0.4.3"
 bitvec = "1.0.1"
 rand = "0.9.0"
+anyhow = "1.0.98"
+fasteval = "0.2.4"
 
 [dev-dependencies]
 insta = "1.42.2"
