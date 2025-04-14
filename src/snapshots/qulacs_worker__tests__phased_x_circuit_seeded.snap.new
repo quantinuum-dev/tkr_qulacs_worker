@@ -1,21 +1,12 @@
 ---
 source: src/main.rs
-assertion_line: 318
+assertion_line: 338
 expression: result.shots
 ---
 OutcomeArray {
     width: 1,
     array: [
         [
-            128,
-        ],
-        [
-            128,
-        ],
-        [
-            128,
-        ],
-        [
             0,
         ],
         [
@@ -35,6 +26,15 @@ OutcomeArray {
         ],
         [
             128,
+        ],
+        [
+            0,
+        ],
+        [
+            0,
+        ],
+        [
+            0,
         ],
     ],
 }
