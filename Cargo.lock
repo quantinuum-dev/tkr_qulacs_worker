@@ -204,18 +204,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
-name = "exmex"
-version = "0.20.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ee7ef9d0ad0bca0963181b4232e4ffce543a0c30fa51ac2ff8a8ece04c3359c"
-dependencies = [
- "lazy_static",
- "num",
- "regex",
- "smallvec",
-]
-
-[[package]]
 name = "fasteval"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -334,12 +322,6 @@ name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
-
-[[package]]
-name = "lazy_static"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
@@ -514,7 +496,9 @@ dependencies = [
 
 [[package]]
 name = "qulacs-bridge"
-version = "0.1.0"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d27e6ab91446c5ecf248023b5c35076062cdb3e671ba5497bd8c82ea6b6fdefa"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -528,7 +512,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bitvec",
- "exmex",
  "fasteval",
  "insta",
  "num",
@@ -741,12 +724,6 @@ checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
 ]
-
-[[package]]
-name = "smallvec"
-version = "1.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
 
 [[package]]
 name = "strsim"
