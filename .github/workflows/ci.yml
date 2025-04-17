@@ -1,0 +1,25 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: DeterminateSystems/nix-installer-action@main
+    - name: Install devenv.sh
+      run: nix profile install nixpkgs#devenv
+    - name: Build
+      run: devenv shell cargo build
+    - name: Run tests
+      run: devenv shell cargo test --verbose
