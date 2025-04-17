@@ -507,23 +507,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qulacs-worker"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitvec",
- "fasteval",
- "insta",
- "num",
- "qulacs-bridge",
- "rand",
- "rstest",
- "serde",
- "serde_json",
- "tket-json-rs",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -790,6 +773,23 @@ dependencies = [
  "serde_json",
  "strum",
  "uuid",
+]
+
+[[package]]
+name = "tkr_qulacs_worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitvec",
+ "fasteval",
+ "insta",
+ "num",
+ "qulacs-bridge",
+ "rand",
+ "rstest",
+ "serde",
+ "serde_json",
+ "tket-json-rs",
 ]
 
 [[package]]
