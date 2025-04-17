@@ -1,7 +1,10 @@
 [package]
-name = "qulacs-worker"
+name = "tkr_qulacs_worker"
+description = "Tierkreis Worker for running Qulacs simulations"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+keywords = ["quantum", "simulator", "qulacs", "tierkreis"]
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
