@@ -7,7 +7,7 @@ permissions:
 on:
   push:
     branches:
-      - push-twswpptsltqq
+      - main
 
 jobs:
   release-plz:
