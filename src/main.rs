@@ -167,11 +167,14 @@ fn simulate_circuits(
 
 fn run(node_definition: &NodeDefinition) -> Result<()> {
     match &*node_definition.function_name {
-        "simulate_circuits" => {
+        "submit" => {
             let circuits_file = File::open(&node_definition.inputs["circuits"])?;
             let circuits: Vec<SerialCircuit> = serde_json::from_reader(&circuits_file)?;
 
-            let results = simulate_circuits(&circuits, 50, None)?;
+            let n_shots_file = File::open(&node_definition.inputs["n_shots"])?;
+            let n_shots: u32 = serde_json::from_reader(&n_shots_file)?;
+
+            let results = simulate_circuits(&circuits, n_shots, None)?;
 
             let outputs_file = File::create(&node_definition.outputs["backend_results"])?;
             serde_json::to_writer(outputs_file, &results)?;
@@ -179,12 +182,15 @@ fn run(node_definition: &NodeDefinition) -> Result<()> {
             File::create(&node_definition.done_path)?;
             Ok(())
         }
-        "simulate_circuit" => {
+        "submit_single" => {
             let circuit_file = File::open(&node_definition.inputs["circuit"])?;
             let circuit: SerialCircuit = serde_json::from_reader(&circuit_file)?;
 
+            let n_shots_file = File::open(&node_definition.inputs["n_shots"])?;
+            let n_shots: u32 = serde_json::from_reader(&n_shots_file)?;
+
             let mut rng = new_rng(None);
-            let result = simulate_circuit(&circuit, 50, &mut rng)?;
+            let result = simulate_circuit(&circuit, n_shots, &mut rng)?;
 
             let output_file = File::create(&node_definition.outputs["backend_result"])?;
             serde_json::to_writer(output_file, &result)?;
@@ -192,6 +198,7 @@ fn run(node_definition: &NodeDefinition) -> Result<()> {
             File::create(&node_definition.done_path)?;
             Ok(())
         }
+
         _ => unimplemented!(),
     }
 }
