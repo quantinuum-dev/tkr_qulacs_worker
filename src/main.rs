@@ -5,18 +5,27 @@ use std::{collections::HashMap, env::args, fs::File, path::PathBuf};
 
 use anyhow::Result;
 use fasteval::Evaler;
+#[cfg(feature = "mpi")]
+use mpi::topology::Communicator;
 use qulacs_bridge::ffi::{
-    add_gate_copy, get_classical_register, merge, new_cnot_gate, new_h_gate, new_measurement,
-    new_pauli_rotation_gate, new_quantum_circuit, new_quantum_state, new_r_x_gate, new_r_z_gate,
-    new_x_gate, new_y_gate, new_z_gate, set_zero_state, update_quantum_state, Pauli,
-    QuantumCircuit,
+    add_gate_copy, merge, new_cnot_gate, new_h_gate, new_pauli_rotation_gate, new_quantum_circuit,
+    new_quantum_state, new_r_x_gate, new_r_z_gate, new_x_gate, new_y_gate, new_z_gate,
+    set_zero_state, update_quantum_state, Pauli, QuantumCircuit,
 };
+#[cfg(not(feature = "mpi"))]
+use qulacs_bridge::ffi::{get_classical_register, new_measurement};
+#[cfg(feature = "mpi")]
+use qulacs_bridge::ffi::{new_identity_gate, quantum_state_sampling};
 use qulacs_bridge::UniquePtr;
 use rand::rngs::SmallRng;
 use rand::{Rng, RngCore, SeedableRng};
-use results::{convert_shots, BackendResult};
 use serde::{Deserialize, Serialize};
 use tket_json_rs::{circuit_json::Command, OpType, SerialCircuit};
+
+#[cfg(feature = "mpi")]
+use crate::results::{convert_samples, BackendResult};
+#[cfg(not(feature = "mpi"))]
+use crate::results::{convert_shots, BackendResult};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 struct NodeDefinition {
@@ -72,7 +81,8 @@ fn new_rng(seed: Option<u64>) -> Box<dyn RngCore> {
 
 fn convert_circuit(
     circuit: &SerialCircuit,
-    rng: &mut Box<dyn RngCore>,
+    #[cfg(feature = "mpi")] _rng: &mut Box<dyn RngCore>,
+    #[cfg(not(feature = "mpi"))] rng: &mut Box<dyn RngCore>,
 ) -> Result<UniquePtr<QuantumCircuit>> {
     let qulacs_circuit = new_quantum_circuit(circuit.qubits.len().try_into().unwrap());
     let mut evaluator = Evaluator::new();
@@ -110,6 +120,14 @@ fn convert_circuit(
 
                 new_pauli_rotation_gate(&[index_1, index_2], &[Pauli::Z, Pauli::Z], alpha)
             }
+            // Mid-circuit measurement is not supported for MPI.
+            #[cfg(feature = "mpi")]
+            OpType::Measure => {
+                let index = get_arg(&command, 0);
+
+                new_identity_gate(index)
+            }
+            #[cfg(not(feature = "mpi"))]
             OpType::Measure => {
                 let index = get_arg(&command, 0);
                 let reg = get_arg(&command, 1);
@@ -138,14 +156,26 @@ fn simulate_circuit(
     let state = new_quantum_state(n_qubits.try_into().unwrap(), true);
     let circuit = convert_circuit(circuit, &mut rng)?;
 
-    let mut shots = Vec::new();
-    for _ in 0..n_shot {
+    // TODO: We need the same seed on each node for MPI?
+    #[cfg(feature = "mpi")]
+    let shots = {
         set_zero_state(&state);
         update_quantum_state(&circuit, &state, rng.random());
-        let register = get_classical_register(&state);
-        shots.push(register);
-    }
-    let shots = convert_shots(shots);
+        let samples = quantum_state_sampling(&state, n_shot, rng.random());
+        convert_samples(n_shot as usize, samples)
+    };
+
+    #[cfg(not(feature = "mpi"))]
+    let shots = {
+        let mut shots = Vec::new();
+        for _ in 0..n_shot {
+            set_zero_state(&state);
+            update_quantum_state(&circuit, &state, rng.random());
+            let register = get_classical_register(&state);
+            shots.push(register);
+        }
+        convert_shots(shots)
+    };
     Ok(BackendResult {
         bits,
         qubits,
@@ -196,6 +226,33 @@ fn run(node_definition: &NodeDefinition) -> Result<()> {
             serde_json::to_writer(output_file, &result)?;
 
             File::create(&node_definition.done_path)?;
+            Ok(())
+        }
+
+
+        #[cfg(feature = "mpi")]
+        "submit_single_mpi" => {
+            let universe = mpi::initialize().unwrap();
+            let world = universe.world();
+            let _size = world.size();
+            let rank = world.rank();
+
+            let circuit_file = File::open(&node_definition.inputs["circuit"])?;
+            let circuit: SerialCircuit = serde_json::from_reader(&circuit_file)?;
+
+            let n_shots_file = File::open(&node_definition.inputs["n_shots"])?;
+            let n_shots: u32 = serde_json::from_reader(&n_shots_file)?;
+
+            let mut rng = new_rng(None);
+            let result = simulate_circuit(&circuit, n_shots, &mut rng)?;
+
+            if rank == 0 {
+                let output_file = File::create(&node_definition.outputs["backend_result"])?;
+                serde_json::to_writer(output_file, &result)?;
+
+                File::create(&node_definition.done_path)?;
+            }
+
             Ok(())
         }
 
