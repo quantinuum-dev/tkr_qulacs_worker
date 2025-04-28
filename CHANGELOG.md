@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/quantinuum-dev/tkr_qulacs_worker/compare/v0.1.0...v0.1.1) - 2025-04-28
+
+### Added
+
+- Allow n_shots to be specified
+
 ## [0.1.0](https://github.com/quantinuum-dev/tkr_qulacs_worker/releases/tag/v0.1.0) - 2025-04-17
 
 ### Added
