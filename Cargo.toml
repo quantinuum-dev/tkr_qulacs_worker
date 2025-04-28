@@ -1,7 +1,7 @@
 [package]
 name = "tkr_qulacs_worker"
 description = "Tierkreis Worker for running Qulacs simulations"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "Apache-2.0"
 keywords = ["quantum", "simulator", "qulacs", "tierkreis"]
