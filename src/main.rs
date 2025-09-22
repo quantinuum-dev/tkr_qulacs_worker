@@ -162,7 +162,7 @@ fn simulate_circuit(
         set_zero_state(&state);
         update_quantum_state(&circuit, &state, rng.random());
         let samples = quantum_state_sampling(&state, n_shot, rng.random());
-        convert_samples(n_shot as usize, samples)
+        convert_samples(bits.len(), samples)
     };
 
     #[cfg(not(feature = "mpi"))]
@@ -228,7 +228,6 @@ fn run(node_definition: &NodeDefinition) -> Result<()> {
             File::create(&node_definition.done_path)?;
             Ok(())
         }
-
 
         #[cfg(feature = "mpi")]
         "submit_single_mpi" => {

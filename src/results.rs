@@ -47,24 +47,28 @@ pub(crate) fn convert_shots(shots: Vec<Vec<u64>>) -> OutcomeArray {
 
 #[cfg(feature = "mpi")]
 #[inline]
-fn convert_sample(width: usize, sample: u64) -> Vec<u8> {
+fn convert_sample(trunc: usize, sample: u64) -> Vec<u8> {
     let bits: BitVec<u8, Msb0> = BitVec::<_, Lsb0>::from_element(sample)
         .chunks(64)
         .flat_map(|x| x.to_bitvec())
         .collect();
     let mut vec = bits.into_vec();
-    vec.truncate(width / 8);
+    vec.truncate(trunc);
     vec
 }
 
 #[cfg(feature = "mpi")]
 #[inline]
 pub(crate) fn convert_samples(width: usize, samples: Vec<u64>) -> OutcomeArray {
+    use num::integer::div_rem;
+
+    let (div, rem) = div_rem(width, 8);
+    let trunc = div + (if rem > 0 { 1 } else { 0 });
     OutcomeArray {
         width,
         array: samples
             .into_iter()
-            .map(|x| convert_sample(width, x))
+            .map(|x| convert_sample(trunc, x))
             .collect(),
     }
 }
@@ -95,17 +99,18 @@ mod tests {
 
     #[cfg(feature = "mpi")]
     #[rstest]
-    #[case(8, 0, vec![0])]
-    #[case(8, 1, vec![128])]
-    #[case(8, 2, vec![64])]
-    #[case(8, 4, vec![32])]
-    #[case(8, 8, vec![16])]
-    #[case(16, 512, vec![0, 64])]
+    #[case(1, 0, vec![0])]
+    #[case(2, 0, vec![0, 0])]
+    #[case(1, 1, vec![128])]
+    #[case(1, 2, vec![64])]
+    #[case(1, 4, vec![32])]
+    #[case(1, 8, vec![16])]
+    #[case(2, 512, vec![0, 64])]
     fn convert_sample_examples(
-        #[case] width: usize,
+        #[case] trunc: usize,
         #[case] sample: u64,
         #[case] expected: Vec<u8>,
     ) {
-        assert_eq!(convert_sample(width, sample), expected);
+        assert_eq!(convert_sample(trunc, sample), expected);
     }
 }
