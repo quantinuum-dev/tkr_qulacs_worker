@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/quantinuum-dev/tkr_qulacs_worker/compare/v0.1.1...v0.1.2) - 2025-09-22
+
+### Added
+
+- Enable MPI support
+
+### Fixed
+
+- Fix result truncation
+
+### Other
+
+- Update CI and deps
+- Use mpi feature in CI
+
 ## [0.1.1](https://github.com/quantinuum-dev/tkr_qulacs_worker/compare/v0.1.0...v0.1.1) - 2025-04-28
 
 ### Added
