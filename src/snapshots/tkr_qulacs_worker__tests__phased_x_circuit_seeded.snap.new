@@ -1,39 +1,40 @@
 ---
 source: src/main.rs
+assertion_line: 401
 expression: result.shots
 ---
 OutcomeArray {
-    width: 8,
+    width: 1,
     array: [
         [
-            195,
+            128,
         ],
         [
-            90,
+            128,
         ],
         [
-            195,
+            0,
         ],
         [
-            120,
+            128,
         ],
         [
-            195,
+            0,
         ],
         [
-            120,
+            0,
         ],
         [
-            120,
+            0,
         ],
         [
-            51,
+            0,
         ],
         [
-            135,
+            128,
         ],
         [
-            51,
+            0,
         ],
     ],
 }

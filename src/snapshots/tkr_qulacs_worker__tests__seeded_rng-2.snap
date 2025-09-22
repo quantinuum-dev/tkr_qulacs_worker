@@ -1,0 +1,5 @@
+---
+source: src/main.rs
+expression: "rng2.random::<u32>()"
+---
+430144855

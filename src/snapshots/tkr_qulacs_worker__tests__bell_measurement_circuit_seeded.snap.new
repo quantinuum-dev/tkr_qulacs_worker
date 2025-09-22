@@ -1,16 +1,22 @@
 ---
 source: src/main.rs
-assertion_line: 338
+assertion_line: 363
 expression: result.shots
 ---
 OutcomeArray {
-    width: 1,
+    width: 2,
     array: [
         [
             0,
         ],
         [
-            0,
+            192,
+        ],
+        [
+            192,
+        ],
+        [
+            192,
         ],
         [
             0,
@@ -19,13 +25,7 @@ OutcomeArray {
             0,
         ],
         [
-            128,
-        ],
-        [
-            128,
-        ],
-        [
-            128,
+            192,
         ],
         [
             0,
@@ -34,7 +34,7 @@ OutcomeArray {
             0,
         ],
         [
-            0,
+            192,
         ],
     ],
 }

@@ -3,37 +3,37 @@ source: src/main.rs
 expression: result.shots
 ---
 OutcomeArray {
-    width: 8,
+    width: 2,
     array: [
         [
-            195,
+            0,
         ],
         [
-            90,
+            0,
         ],
         [
-            195,
+            0,
         ],
         [
-            120,
+            0,
         ],
         [
-            195,
+            0,
         ],
         [
-            120,
+            0,
         ],
         [
-            120,
+            0,
         ],
         [
-            51,
+            0,
         ],
         [
-            135,
+            0,
         ],
         [
-            51,
+            0,
         ],
     ],
 }
