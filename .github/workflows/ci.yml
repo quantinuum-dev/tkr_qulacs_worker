@@ -20,6 +20,6 @@ jobs:
     - name: Install devenv.sh
       run: nix profile install nixpkgs#devenv
     - name: Build
-      run: devenv shell cargo build
+      run: devenv shell cargo build --features mpi
     - name: Run tests
-      run: devenv shell cargo test --verbose
+      run: devenv shell cargo test --verbose --features mpi
