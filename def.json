@@ -1,6 +1,0 @@
-{
-  "function_name": "submit_single_mpi",
-  "inputs": {"circuit": "/home/john/Dojo/qulacs-worker/data/phasedx.json", "n_shots": "/home/john/Dojo/qulacs-worker/n_shots.json"},
-  "outputs": {"backend_result": "/home/john/Dojo/qulacs-worker/out.json"},
-  "done_path": "/tmp/_done"
-}
